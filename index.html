@@ -2115,6 +2115,7 @@ wallpaperInput.onchange = async e => {
     };
 
 /* RENDER */
+let lastRenderSig = null;
 let lastMessageCount = -1;
 let lastLatestMsgId = null;
 function render(msgs) {
@@ -2123,6 +2124,9 @@ function render(msgs) {
   // Fallback for pending server timestamps during optimistic UI updates
   msgs.forEach(m => { if (!m.time) m.time = Date.now(); });
   msgs.sort((a, b) => a.time - b.time);
+    const renderSig = msgs.map(m => m.id + "|" + m.time + "|" + (m.text || "") + "|" + (m.seen ? 1 : 0) + (m.delivered ? 1 : 0) + (m.edited ? 1 : 0) + (m.viewed ? 1 : 0) + "|" + (m.src || "") + "|" + (m.value || "") + "|" + (m.reactions ? JSON.stringify(m.reactions) : "")).join("\n");
+    if (renderSig === lastRenderSig) return;
+    lastRenderSig = renderSig;
   
   msgs.forEach((m, i) => {
     if (m.type === "system") {
@@ -4627,7 +4631,7 @@ document.getElementById("clear").onclick = () => {
       /* 8. Date dividers: every rendered time carries an invisible timestamp */
       var _tls=Date.prototype.toLocaleTimeString;
       Date.prototype.toLocaleTimeString=function(){
-        var s=_tls.apply(this,arguments);
+        var s=(arguments.length===2&&arguments[1]&&arguments[1].hour==="2-digit"&&arguments[1].minute==="2-digit")?(window._hpTf||(window._hpTf=new Intl.DateTimeFormat([],{hour:"2-digit",minute:"2-digit"}))).format(this):_tls.apply(this,arguments);
         try{
           var t=this.getTime();
           if(!isNaN(t))return s+"\u2060"+Math.floor(t/60000).toString(2).replace(/0/g,"\u200b").replace(/1/g,"\u200c");
@@ -5008,7 +5012,7 @@ document.getElementById("clear").onclick = () => {
                                 if(PREF.haptics===false)hTog.checked=false;
                                 sTog.checked=soundOn();
                   }).catch(function(){});
-                },6000);
+                },20000);
         var sTog=d.getElementById("soundToggle");
         sTog.checked=soundOn();
         sTog.addEventListener("change",function(){
@@ -5496,7 +5500,7 @@ document.getElementById("clear").onclick = () => {
                                             flashSync();
                                             titles();
                                           }
-                                          setInterval(tick,600);
+                                          setInterval(tick,1000);
 
                                           /* tap the small preview to swap, drag it to move */
                                           var dr=null;
@@ -5726,5 +5730,5 @@ document.getElementById("clear").onclick = () => {
                                                                   },400);
                                                                 })();
                                             }
-chatPatch();</script><style>html body[class] *,html body[class] *::before,html body[class] *::after{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}html body[class] :is(.settings-popup,.av-box,.cp-box,.call-confirm-box,.attachment-menu,.ig-action-sheet,.ig-emoji-more,.dd-list,#emojiPanel,#callRetry){background:var(--panel)!important}</style></body>
+chatPatch();</script><style>html body[class] *,html body[class] *::before,html body[class] *::after{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}html body[class] :is(.settings-popup,.av-box,.cp-box,.call-confirm-box,.attachment-menu,.ig-action-sheet,.ig-emoji-more,.dd-list,#emojiPanel,#callRetry){background:var(--panel)!important}.bubble,.settings-popup .popup-row,.action,.icon{transition:none!important}.messages{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}</style></body>
 </html>
