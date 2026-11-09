@@ -1353,6 +1353,14 @@ document.querySelectorAll(".role-btn").forEach(btn => {
 
 roomCodeInput.oninput = () => pinErrorText.style.opacity = "0";
 
+// Preload the room PIN(s) at page load so tapping the code button opens instantly
+window.hpPinWarm = Promise.all(
+  (localStorage.getItem("hp_allowed_rooms") || "2007").split(',').map(r => r.trim()).filter(Boolean).map(async r => {
+    const pinSnap = await get(ref(db, `rooms/${r}/settings/pin`));
+    return { room: r, validPin: pinSnap.exists() ? String(pinSnap.val()) : r };
+  })
+).catch(() => null);
+
 joinBtn.onclick = async () => {
   try {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -1380,13 +1388,22 @@ joinBtn.onclick = async () => {
     const allowedList = allowedStr.split(',').map(r => r.trim()).filter(Boolean);
     
     // Check all allowed rooms concurrently
-    const pinChecks = allowedList.map(async r => {
+    const pinChecks = (window.hpPinWarm ? [] : allowedList).map(async r => {
       const pinSnap = await get(ref(db, `rooms/${r}/settings/pin`));
       return { room: r, validPin: pinSnap.exists() ? String(pinSnap.val()) : r };
     });
     
-    const results = await Promise.all(pinChecks);
-    const match = results.find(res => res.validPin === code);
+    let results = (window.hpPinWarm ? await window.hpPinWarm : null) || await Promise.all(pinChecks);
+    let match = results.find(res => res.validPin === code);
+        if (!match && window.hpPinWarm) {
+          // Preloaded data may be stale (PIN changed) - re-check live once
+          window.hpPinWarm = null;
+          results = await Promise.all(allowedList.map(async r => {
+            const pinSnap = await get(ref(db, `rooms/${r}/settings/pin`));
+            return { room: r, validPin: pinSnap.exists() ? String(pinSnap.val()) : r };
+          }));
+          match = results.find(res => res.validPin === code);
+        }
     
     if (!match) {
       pinErrorText.textContent = "Incorrect PIN";
