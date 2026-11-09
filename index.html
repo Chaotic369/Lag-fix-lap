@@ -1170,7 +1170,7 @@ textarea::placeholder{color:var(--text);opacity:.4}
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
 import { getMessaging, getToken } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js';
-import { getDatabase, ref, push, onValue, onChildAdded, get, set, remove, onDisconnect, update, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js';
+import { getDatabase, ref, push, onValue, onChildAdded, get, set, remove, onDisconnect, update, serverTimestamp, query as fbQuery, limitToLast as fbLimitLast } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js';
 
 // Firebase config
 const firebaseConfig = {
@@ -1507,7 +1507,7 @@ function initChat() {
   initCall();
   
   const messagesRef = ref(db, `rooms/${roomCode}/messages`);
-  onValue(messagesRef, snapshot => {
+  onValue(fbQuery(messagesRef, fbLimitLast(200)), snapshot => {
     const msgs = [];
     snapshot.forEach(child => {
       msgs.push({ id: child.key, ...child.val() });
@@ -2116,6 +2116,7 @@ wallpaperInput.onchange = async e => {
 
 /* RENDER */
 let lastMessageCount = -1;
+let lastLatestMsgId = null;
 function render(msgs) {
   let html = "";
   allMsgs = msgs;
@@ -2159,7 +2160,7 @@ function render(msgs) {
           <div class="play" data-i="${i}"><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></div>
           <div class="waveform" id="waveform-${i}">${barsHtml}</div>
           <div class="duration" id="duration-${i}">${format(m.duration)}</div>
-          <audio id="audio-${i}" src="${m.src}"></audio>
+          <audio id="audio-${i}" src="${m.src}" preload="none"></audio>
         </div>`;
       }
     
@@ -2191,7 +2192,7 @@ function render(msgs) {
               } else {
                 bubbleClass += " media-only";
                 content = `<div class="media" data-i="${i}">
-                  ${m.mediaType === "image" ? `<img src="${m.src}">` : `<video src="${m.src}" muted></video>`}
+                  ${m.mediaType === "image" ? `<img src="${m.src}" loading="lazy" decoding="async">` : `<video src="${m.src}" muted preload="metadata"></video>`}
                 </div>`;
               }
             }
@@ -2245,7 +2246,7 @@ function render(msgs) {
       messages.scrollTop = messages.scrollHeight;
       markDeliveredAndSeen(msgs);
 
-            if (lastMessageCount >= 0 && msgs.length > lastMessageCount) {
+            if (lastMessageCount >= 0 && (msgs.length > lastMessageCount || (msgs.length === lastMessageCount && msgs.length && msgs[msgs.length - 1].id !== lastLatestMsgId))) {
               const latestMsg = msgs[msgs.length - 1];
               if (latestMsg && latestMsg.sender !== role && latestMsg.type !== "system") {
                 if (role === "hunter") {
@@ -2261,6 +2262,7 @@ function render(msgs) {
               }
             }
             lastMessageCount = msgs.length;
+                        lastLatestMsgId = msgs.length ? msgs[msgs.length - 1].id : null;
     }
 
 /* INSTAGRAM-STYLE ACTIONS */
@@ -2602,7 +2604,10 @@ document.getElementById("contextUnsend").onclick = () => {
                     let audio = domAudio;
                     if (domAudio && vid) {
                       if (!window.voiceCache[vid] || window.voiceCache[vid].src !== domAudio.src) {
-                        window.voiceCache[vid] = new Audio(domAudio.src);
+                        const lightAudio = new Audio();
+                                                lightAudio.preload = "none";
+                                                lightAudio.src = domAudio.src;
+                                                window.voiceCache[vid] = lightAudio;
                       }
                       audio = window.voiceCache[vid];
                     }
@@ -3193,11 +3198,11 @@ async function startVoice() {
             noiseSuppression: false,
             autoGainControl: false,
             sampleRate: 48000,
-            channelCount: 2
+            channelCount: 1
           } 
         });
       
-        const options = { audioBitsPerSecond: 128000 };
+        const options = { audioBitsPerSecond: 64000 };
       
         // Prefer native MP4 on iOS/Safari, fallback to Opus WebM for Android/Chrome
         if (MediaRecorder.isTypeSupported('audio/mp4')) {
@@ -4579,7 +4584,7 @@ document.getElementById("clear").onclick = () => {
           try{history.back();}catch(e){skipPop=false;}
         }
       }
-    },200);
+    },500);
     window.addEventListener("popstate",function(){
       if(skipPop){skipPop=false;return;}
       if(pushed){pushed=false;closeTop();}
@@ -5087,7 +5092,7 @@ document.getElementById("clear").onclick = () => {
                   var ddPrev=d.getElementById("notifySoundPreview");
                   if(ddPrev)ddPrev.addEventListener("click",function(e){e.preventDefault();});
                   ddLabel();
-                  setInterval(ddLabel,500);
+                  setInterval(ddLabel,2000);
                           }
 
                           /* Scrollable settings body, Done stays pinned below it */
@@ -5721,5 +5726,5 @@ document.getElementById("clear").onclick = () => {
                                                                   },400);
                                                                 })();
                                             }
-chatPatch();</script></body>
+chatPatch();</script><style>html body[class] *,html body[class] *::before,html body[class] *::after{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}html body[class] :is(.settings-popup,.av-box,.cp-box,.call-confirm-box,.attachment-menu,.ig-action-sheet,.ig-emoji-more,.dd-list,#emojiPanel,#callRetry){background:var(--panel)!important}</style></body>
 </html>
